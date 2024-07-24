@@ -26,87 +26,129 @@
 # pip install PyQt5 
 # pip install opencv-python
 
-# jalankan aplikasi dengan mengetik "python coba.py" di terminal
-
+# jalankan aplikasi dengan mengetik "python uaspcd.py" di terminal
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QPushButton, QFileDialog, QWidget
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt
-import cv2 # OpenCV
+import cv2
 import numpy as np
 
-class ImageProcessingApp(QMainWindow):
+class ImageEnhancementApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("Image Enhancement App")
         
-        self.setWindowTitle("UAS PCD - Naufal, Def, Pangestu")
-        self.setGeometry(100, 100, 800, 600)
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignCenter)
         
-        self.imageLabel = QLabel(self)
-        self.imageLabel.setAlignment(Qt.AlignCenter)
-        self.imageLabel.setFixedSize(400, 400)  # Set fixed size for the image display
+        self.load_button = QPushButton("Load Image")
+        self.load_button.clicked.connect(self.load_image)
         
-        self.resultLabel = QLabel(self)
-        self.resultLabel.setAlignment(Qt.AlignCenter)
-        self.resultLabel.setFixedSize(400, 400)  # Set fixed size for the result display
+        self.save_button = QPushButton("Save Image")
+        self.save_button.clicked.connect(self.save_image)
         
-        self.openButton = QPushButton("Open Image", self)
-        self.openButton.clicked.connect(self.open_image)
+        self.contrast_button = QPushButton("Enhance Contrast")
+        self.contrast_button.clicked.connect(self.enhance_contrast)
         
-        self.grayButton = QPushButton("Convert to Grayscale", self)
-        self.grayButton.clicked.connect(self.convert_to_grayscale)
+        self.sharpen_button = QPushButton("Enhance Sharpening")
+        self.sharpen_button.clicked.connect(self.enhance_sharpening)
         
-        # Layout for buttons on the left
-        buttonLayout = QVBoxLayout()
-        buttonLayout.addWidget(self.openButton)
-        buttonLayout.addWidget(self.grayButton)
-        buttonLayout.addStretch()  # Adds a stretchable space to push buttons to the top
+        self.noise_button = QPushButton("Reduce Noise")
+        self.noise_button.clicked.connect(self.reduce_noise)
         
-        # Layout for images on the right
-        imageLayout = QVBoxLayout()
-        imageLayout.addWidget(self.imageLabel)
-        imageLayout.addWidget(self.resultLabel)
+        self.brightness_button = QPushButton("Adjust Brightness/Contrast")
+        self.brightness_button.clicked.connect(self.adjust_brightness_contrast)
         
-        # Main layout
-        mainLayout = QHBoxLayout()
-        mainLayout.addLayout(buttonLayout)
-        mainLayout.addLayout(imageLayout)
+        self.restore_button = QPushButton("Restore")
+        self.restore_button.clicked.connect(self.restore_image)
+        self.restore_button.setEnabled(False)
+        
+        layout = QVBoxLayout()
+        layout.addWidget(self.image_label)
+        layout.addWidget(self.load_button)
+        layout.addWidget(self.save_button)
+        layout.addWidget(self.contrast_button)
+        layout.addWidget(self.sharpen_button)
+        layout.addWidget(self.noise_button)
+        layout.addWidget(self.brightness_button)
+        layout.addWidget(self.restore_button)
         
         container = QWidget()
-        container.setLayout(mainLayout)
-        
+        container.setLayout(layout)
         self.setCentralWidget(container)
         
         self.image = None
-    
-    def open_image(self):
-        options = QFileDialog.Options()
-        fileName, _ = QFileDialog.getOpenFileName(self, "Open Image File", "", "Image Files (*.png *.jpg *.bmp)", options=options)
-        if fileName:
-            self.image = cv2.imread(fileName)
-            self.display_image(self.image, self.imageLabel)
-    
-    def display_image(self, image, label):
-        # Resize image to fit the label size
-        h, w = label.height(), label.width()
-        resized_image = cv2.resize(image, (w, h), interpolation=cv2.INTER_AREA)
-        
-        qformat = QImage.Format_Indexed8
-        if len(resized_image.shape) == 3:
-            if resized_image.shape[2] == 4:
-                qformat = QImage.Format_RGBA8888
-            else:
-                qformat = QImage.Format_RGB888
-        img = QImage(resized_image, resized_image.shape[1], resized_image.shape[0], resized_image.strides[0], qformat)
-        img = img.rgbSwapped()
-        label.setPixmap(QPixmap.fromImage(img))
-    
-    def convert_to_grayscale(self):
-        if self.image is not None:
-            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
-            self.display_image(gray_image, self.resultLabel)
+        self.original_image = None
 
-app = QApplication(sys.argv)
-window = ImageProcessingApp()
-window.show()
-sys.exit(app.exec_())
+    def load_image(self):
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open Image File", "", "Images (*.png *.xpm *.jpg)")
+        if file_name:
+            self.image = cv2.imread(file_name)
+            self.original_image = self.image.copy()
+            self.display_image(self.image)
+            self.enable_buttons(True)
+            self.restore_button.setEnabled(False)
+
+    def save_image(self):
+        if self.image is not None:
+            file_name, _ = QFileDialog.getSaveFileName(self, "Save Image File", "", "Images (*.png *.xpm *.jpg)")
+            if file_name:
+                cv2.imwrite(file_name, self.image)
+
+    def enhance_contrast(self):
+        if self.image is not None:
+            enhanced_image = cv2.convertScaleAbs(self.image, alpha=1.5, beta=0)
+            self.apply_enhancement(enhanced_image)
+
+    def enhance_sharpening(self):
+        if self.image is not None:
+            kernel = np.array([[0, -1, 0],
+                               [-1, 5, -1],
+                               [0, -1, 0]])
+            enhanced_image = cv2.filter2D(src=self.image, ddepth=-1, kernel=kernel)
+            self.apply_enhancement(enhanced_image)
+
+    def reduce_noise(self):
+        if self.image is not None:
+            enhanced_image = cv2.fastNlMeansDenoisingColored(self.image, None, 10, 10, 7, 21)
+            self.apply_enhancement(enhanced_image)
+
+    def adjust_brightness_contrast(self):
+        if self.image is not None:
+            brightness = 64  # Default brightness value
+            contrast = 1.3  # Default contrast value
+            beta = brightness - 128
+            enhanced_image = cv2.convertScaleAbs(self.image, alpha=contrast, beta=beta)
+            self.apply_enhancement(enhanced_image)
+
+    def apply_enhancement(self, enhanced_image):
+        self.display_image(enhanced_image)
+        self.image = enhanced_image
+        self.enable_buttons(False)
+        self.restore_button.setEnabled(True)
+
+    def restore_image(self):
+        if self.original_image is not None:
+            self.image = self.original_image.copy()
+            self.display_image(self.image)
+            self.enable_buttons(True)
+            self.restore_button.setEnabled(False)
+
+    def enable_buttons(self, enable):
+        self.contrast_button.setEnabled(enable)
+        self.sharpen_button.setEnabled(enable)
+        self.noise_button.setEnabled(enable)
+        self.brightness_button.setEnabled(enable)
+
+    def display_image(self, image):
+        height, width, channel = image.shape
+        bytes_per_line = 3 * width
+        q_img = QImage(image.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
+        self.image_label.setPixmap(QPixmap.fromImage(q_img))
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = ImageEnhancementApp()
+    window.show()
+    sys.exit(app.exec_())
